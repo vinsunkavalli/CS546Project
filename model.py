@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from graph import Graph
-from transformers import BertModel
+from transformers import BertModel, RobertaModel, XLMRobertaModel, DistilBertModel
 from global_feature import generate_global_feature_vector, generate_global_feature_maps
 from util import normalize_score
 
@@ -607,9 +607,26 @@ class OneIE(nn.Module):
         :param cache_dir (str): path to the BERT cache directory
         """
         print('Loading pre-trained BERT model {}'.format(name))
-        self.bert = BertModel.from_pretrained(name,
-                                              cache_dir=cache_dir,
-                                              output_hidden_states=True)
+
+        if name.startswith('bert-'):
+            self.bert = BertModel.from_pretrained(name,
+                                                cache_dir=cache_dir,
+                                                output_hidden_states=True)
+        elif name.startswith('roberta-'):
+            self.bert = RobertaModel.from_pretrained(name,
+                                                cache_dir=cache_dir,
+                                                output_hidden_states=True)
+        elif name.startswith('xlm-roberta-'):
+            self.bert = XLMRobertaModel.from_pretrained(name,
+                                                cache_dir=cache_dir,
+                                                output_hidden_states=True)
+        elif name.startswith('distilbert-'):
+            self.bert = DistilBertModel.from_pretrained(name,
+                                                cache_dir=cache_dir,
+                                                output_hidden_states=True)
+        else:
+            raise ValueError('Unknown model: {}'.format(name))
+
 
     def encode(self, piece_idxs, attention_masks, token_lens):
         """Encode input sequences with BERT

@@ -4,7 +4,7 @@ import os
 
 from typing import Dict, Any
 
-from transformers import (BertConfig, RobertaConfig, XLMRobertaConfig,
+from transformers import (BertConfig, RobertaConfig, XLMRobertaConfig, DistilBertConfig
                           PretrainedConfig)
 
 class Config(object):
@@ -98,5 +98,8 @@ class Config(object):
         elif self.bert_model_name.startswith('xlm-roberta-'):
             return XLMRobertaConfig.from_pretrained(self.bert_model_name,
                                                     cache_dir=self.bert_cache_dir)
+        elif self.bert_model_name.startswith('distilbert-'):
+            return DistilBertConfig.from_pretrained(self.bert_model_name,
+                                                    cahec_dir=self.bert_cache_dir)
         else:
             raise ValueError('Unknown model: {}'.format(self.bert_model_name))

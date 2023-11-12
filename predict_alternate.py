@@ -9,7 +9,7 @@ import scorer
 
 import torch
 from torch.utils.data import DataLoader
-from transformers import BertTokenizer, BertConfig, BertTokenizerFast, BertModel
+from transformers import BertTokenizer, BertConfig, BertTokenizerFast, BertModel, RobertaTokenizer, XLMRobertaTokenizer, DistilBertTokenizer
 
 from model import OneIE
 from config import Config
@@ -21,7 +21,7 @@ cur_dir = os.path.dirname(os.path.realpath(__file__))
 format_ext_mapping = {'txt': 'txt', 'ltf': 'ltf.xml', 'json': 'json',
                       'json_single': 'json'}
 
-def load_model(model_path, device=0, gpu=False, beam_size=5):
+def load_model(bert_model_name, model_path, device=0, gpu=False, beam_size=5):
     print('Loading the model from {}'.format(model_path))
     map_location = 'cuda:{}'.format(device) if gpu else 'cpu'
     state = torch.load(model_path, map_location=map_location)
@@ -40,8 +40,26 @@ def load_model(model_path, device=0, gpu=False, beam_size=5):
     if gpu:
         model.cuda(device)
     #changing bert model
-    bert_model_name = 'bert-large-cased-whole-word-masking-finetuned-squad'
-    tokenizer = BertTokenizer.from_pretrained(bert_model_name, cache_dir=config.bert_cache_dir, do_lower_case=False)
+    #bert_model_name = 'bert-large-cased-whole-word-masking-finetuned-squad'
+    #tokenizer = BertTokenizer.from_pretrained(new_bert_model, cache_dir=config.bert_cache_dir, do_lower_case=False)
+
+    tokenizer = None
+
+    if bert_model_name.startswith('bert-'):
+        tokenizer = BertTokenizer.from_pretrained(bert_model_name, cache_dir=config.bert_cache_dir, do_lower_case=False)
+
+    elif bert_model_name.startswith('roberta-'):
+        tokenizer = RobertaTokenizer.from_pretrained(bert_model_name, cache_dir=config.bert_cache_dir, do_lower_case=False)
+                                            
+    elif bert_model_name.startswith('xlm-roberta-'):
+        tokenizer = XLMRobertaTokenizer.from_pretrained(bert_model_name, cache_dir=config.bert_cache_dir, do_lower_case=False)
+
+    elif bert_model_name.startswith('distilbert-'):
+        tokeizer = DistilBertTokenizer.from_pretrained(bert_model_name, cache_dir=config.bert_cache_dir, do_lower_case=False)
+
+    else:
+        raise ValueError('Unknown model: {}'.format(bert_model_name))
+    
     model.load_bert(bert_model_name, cache_dir=config.bert_cache_dir)
     #tokenizer = BertTokenizer.from_pretrained(config.bert_model_name,
     #                                          cache_dir=config.bert_cache_dir,
@@ -53,17 +71,7 @@ def load_model(model_path, device=0, gpu=False, beam_size=5):
 def predict_document(path, model, tokenizer, config, batch_size=20, 
                      max_length=128, gpu=False, input_format='txt',
                      language='english'):
-    """
-    :param path (str): path to the input file.
-    :param model (OneIE): pre-trained model object.
-    :param tokenizer (BertTokenizer): BERT tokenizer.
-    :param config (Config): configuration object.
-    :param batch_size (int): Batch size (default=20).
-    :param max_length (int): Max word piece number (default=128).
-    :param gpu (bool): Use GPU or not (default=False).
-    :param input_format (str): Input file format (txt or ltf, default='txt).
-    :param langauge (str): Input document language (default='english').
-    """
+
     test_set = IEDatasetEval(path, max_length=max_length, gpu=gpu,
                              input_format=input_format, language=language)
     #test_set = IEDataset(config.test_file, gpu=gpu,
@@ -92,31 +100,16 @@ def predict_document(path, model, tokenizer, config, batch_size=20,
     return result, info
 
 
-def predict(model_path, input_path, output_path, log_path=None, cs_path=None,
+def predict(new_bert_model, model_path, input_path, output_path, log_path=None, cs_path=None,
          batch_size=50, max_length=128, device=0, gpu=False,
          file_extension='txt', beam_size=5, input_format='txt',
          language='english'):
-    """Perform information extraction.
-    :param model_path (str): Path to the pre-trained model file.
-    :param input_path (str): Path to the input directory.
-    :param output_path (str): Path to the output directory.
-    :param log_path (str): Path to the log file.
-    :param cs_path (str): (optional) Path to the cold-start format output directory.
-    :param batch_size (int): Batch size (default=50).
-    :param max_length (int): Max word piece number for each sentence (default=128).
-    :param device (int): GPU device index (default=0).
-    :param gpu (bool): Use GPU (default=False).
-    :param file_extension (str): Input file extension. Only files ending with the
-    given extension will be processed (default='txt').
-    :param beam_size (int): Beam size of the decoder (default=5).
-    :param input_format (str): Input file format (txt or ltf, default='txt').
-    :param language (str): Document language (default='english').
-    """
+
     # set gpu device
     if gpu:
         torch.cuda.set_device(device)
     # load the model from file
-    model, tokenizer, config = load_model(model_path, device=device, gpu=gpu,
+    model, tokenizer, config = load_model(new_bert_model, model_path, device=device, gpu=gpu,
                                           beam_size=beam_size)
     # get the list of documents
     file_list = glob.glob(os.path.join(input_path, '*.{}'.format(file_extension)))
@@ -165,6 +158,7 @@ def predict(model_path, input_path, output_path, log_path=None, cs_path=None,
 
 
 parser = ArgumentParser()
+parser.add_argument('-n', '--new_bert_model', help="name of alternative bert model")
 parser.add_argument('-m', '--model_path', help='path to the trained model')
 parser.add_argument('-i', '--input_dir', help='path to the input folder (ltf files)')
 parser.add_argument('-o', '--output_dir', help='path to the output folder (json files)')
@@ -182,6 +176,7 @@ args = parser.parse_args()
 extension = format_ext_mapping.get(args.format, 'ltf.xml')
 
 predict(
+    new_bert_model = args.new_bert_model,
     model_path=args.model_path,
     input_path=args.input_dir,
     output_path=args.output_dir,
