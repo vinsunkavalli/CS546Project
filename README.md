@@ -27,4 +27,7 @@ Use the respective files for each method
 
 Refer to the notebooks for each method if something is amiss or not working as we spent the majority of our time using those.
 
+### Results
+
+Use metric.py or metric.ipynb
 
